@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+.DS_Store
+
+# Generated outputs
+pair_nonpair_plots/
+
+# Large local data file; exceeds GitHub's standard file size limit.
+data_range.txt

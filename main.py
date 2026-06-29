@@ -2,7 +2,7 @@ import sys
 from torch.utils.data import DataLoader, ConcatDataset, random_split
 from EventDataset import EventDataset
 from PairEventClassifier import PairEventClassifier
-from PairEventCNN import PairEventCNN
+# from PairEventCNN import PairEventCNN
 
 BATCH_SIZE = 64
 # HIDDEN_DIM = ???

@@ -55,7 +55,8 @@ def plot_event_scatter(features, labels):
 
     n = 1
     event = features[n][WLS_FAST_COUNT:WLS_FAST_COUNT+WLS_SLOW_COUNT]
-    fig.suptitle(f"Event {n} - {"PAIR" if labels[n] == 1 else "NOT-PAIR"}")
+    event_type = "PAIR" if labels[n] == 1 else "NOT-PAIR"
+    fig.suptitle(f"Event {n} - {event_type}")
 
     norm = matplotlib.colors.Normalize(vmin=0, vmax=max(event))
     colorizer = matplotlib.colorizer.Colorizer(norm=norm, cmap="plasma")
@@ -99,7 +100,7 @@ def main():
     statistics = summarize_event_features(features)
     plot_histograms(statistics, labels)
 
-    # plot_event_scatter(features, labels)
+    plot_event_scatter(features, labels)
 
 
 if __name__ == '__main__':
