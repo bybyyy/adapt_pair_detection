@@ -7,5 +7,7 @@ __pycache__/
 # Generated outputs
 pair_nonpair_plots/
 
-# Large local data file; exceeds GitHub's standard file size limit.
+# Local simulation data files are not pushed to GitHub.
+classifier_data_*.txt
 data_range.txt
+more_data.txt
