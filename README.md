@@ -29,6 +29,8 @@ Additional work added on top of that base includes:
 | `compare_pair_nonpair_plots.py` | Generates pair/non-pair comparison plots and summary statistics. |
 | `train_2d_cnn.py` | Trains the original MLP baseline and a 2D CNN on the same split. |
 | `train_hybrid_cnn.py` | Trains the original MLP baseline and a hybrid CNN with engineered features. |
+| `train_threshold_norm_tune.py` | Runs normalization, threshold, and small hyperparameter sweeps for 2D/hybrid CNNs. |
+| `benchmark_pair_detection.py` | Runs the staged benchmark suite and writes JSON, CSV, and Markdown reports. |
 
 ## Data Availability
 
@@ -111,6 +113,39 @@ python train_hybrid_cnn.py <datafile1> [<datafile2> ...]
 ```
 
 The hybrid CNN uses the same detector-map CNN backbone and appends engineered summary features, including total signal, WLS fast/slow totals, edge/calorimeter totals, active WLS channels, and signal fractions. It compares the hybrid model against the original MLP baseline and prints the accuracy difference.
+
+## Running the Stage Benchmark Report
+
+```bash
+python3 benchmark_pair_detection.py
+```
+
+Use a Python environment with PyTorch installed. On the current local machine,
+`/usr/local/bin/python3.11` has been verified to work:
+
+```bash
+/usr/local/bin/python3.11 benchmark_pair_detection.py
+```
+
+By default, this runs the staged benchmark on:
+
+```text
+classifier_data_5MeV.txt classifier_data_10MeV.txt classifier_data_50MeV.txt
+```
+
+The benchmark trains the original MLP, the original 2D CNN, the main `log_block`
+hybrid CNN, and the small tuned grids for hybrid and 2D CNN models. It writes:
+
+- `benchmarks/pair_detection_benchmark.json`
+- `benchmarks/pair_detection_benchmark.csv`
+- `benchmarks/pair_detection_stage_report.md`
+
+Use `--skip-tune` for a faster smoke run that only trains the baseline, original
+2D CNN, and main hybrid CNN:
+
+```bash
+python3 benchmark_pair_detection.py --skip-tune
+```
 
 ## Generating Pair vs Non-Pair Plots
 

@@ -1,0 +1,808 @@
+{
+  "datafiles": [
+    "classifier_data_5MeV.txt",
+    "classifier_data_10MeV.txt",
+    "classifier_data_50MeV.txt"
+  ],
+  "seed": 42,
+  "threshold_metric": "balanced",
+  "split_summary": {
+    "train": {
+      "total": 2551,
+      "pair": 1769,
+      "nonpair": 782
+    },
+    "validation": {
+      "total": 319,
+      "pair": 230,
+      "nonpair": 89
+    },
+    "test": {
+      "total": 319,
+      "pair": 203,
+      "nonpair": 116
+    }
+  },
+  "feature_summary": [
+    {
+      "feature": "Total signal",
+      "pair_mean": 59476.65625,
+      "nonpair_mean": 18352.396484375,
+      "ratio": 3.240811427577738
+    },
+    {
+      "feature": "WLS fast signal",
+      "pair_mean": 233.52679443359375,
+      "nonpair_mean": 87.41033172607422,
+      "ratio": 2.671615469500998
+    },
+    {
+      "feature": "WLS slow signal",
+      "pair_mean": 1789.760009765625,
+      "nonpair_mean": 614.5558471679688,
+      "ratio": 2.912282127024418
+    },
+    {
+      "feature": "Edge detector signal",
+      "pair_mean": 27130.87109375,
+      "nonpair_mean": 9594.67578125,
+      "ratio": 2.8277006656930905
+    },
+    {
+      "feature": "Calorimeter signal",
+      "pair_mean": 30322.5,
+      "nonpair_mean": 8055.7568359375,
+      "ratio": 3.7640783625355265
+    },
+    {
+      "feature": "Active WLS channels",
+      "pair_mean": 111.89691162109375,
+      "nonpair_mean": 59.34042739868164,
+      "ratio": 1.8856775477754606
+    },
+    {
+      "feature": "Slow fraction of WLS signal",
+      "pair_mean": 0.6541396379470825,
+      "nonpair_mean": 0.5754134058952332,
+      "ratio": 1.1368168194297914
+    },
+    {
+      "feature": "Calorimeter fraction of total",
+      "pair_mean": 0.47080546617507935,
+      "nonpair_mean": 0.39506465196609497,
+      "ratio": 1.191717517201424
+    },
+    {
+      "feature": "Edge fraction of total",
+      "pair_mean": 0.4862520098686218,
+      "nonpair_mean": 0.5327345132827759,
+      "ratio": 0.9127473398940813
+    }
+  ],
+  "results": [
+    {
+      "name": "Original MLP baseline",
+      "model_type": "mlp",
+      "tuned": false,
+      "threshold_metric": "fixed_zero",
+      "selected_threshold": 0.0,
+      "valid_loss": 0.3177946090698242,
+      "valid_metrics": {
+        "accuracy": 70.21943573667711,
+        "balanced_accuracy": 74.52613580850024,
+        "precision": 0.9141104294478528,
+        "recall": 0.6478260869565218,
+        "f1": 0.7582697201017812,
+        "tp": 149,
+        "fp": 14,
+        "fn": 81,
+        "tn": 75
+      },
+      "test_metrics": {
+        "accuracy": 70.21943573667711,
+        "balanced_accuracy": 72.35221674876847,
+        "precision": 0.8506493506493507,
+        "recall": 0.645320197044335,
+        "f1": 0.7338935574229691,
+        "tp": 131,
+        "fp": 23,
+        "fn": 72,
+        "tn": 93
+      },
+      "config": {}
+    },
+    {
+      "name": "Original MLP baseline + tuned threshold",
+      "model_type": "mlp",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": 0.32670462131500244,
+      "valid_loss": 0.3177946090698242,
+      "valid_metrics": {
+        "accuracy": 68.65203761755485,
+        "balanced_accuracy": 75.16121152906692,
+        "precision": 0.9391891891891891,
+        "recall": 0.6043478260869565,
+        "f1": 0.7354497354497355,
+        "tp": 139,
+        "fp": 9,
+        "fn": 91,
+        "tn": 80
+      },
+      "test_metrics": {
+        "accuracy": 67.39811912225706,
+        "balanced_accuracy": 70.87438423645321,
+        "precision": 0.8613138686131386,
+        "recall": 0.5812807881773399,
+        "f1": 0.6941176470588234,
+        "tp": 118,
+        "fp": 19,
+        "fn": 85,
+        "tn": 97
+      },
+      "config": {}
+    },
+    {
+      "name": "Original 2D CNN",
+      "model_type": "2d",
+      "tuned": false,
+      "threshold_metric": "fixed_zero",
+      "selected_threshold": 0.0,
+      "valid_loss": 0.29694303274154665,
+      "valid_metrics": {
+        "accuracy": 74.29467084639498,
+        "balanced_accuracy": 77.00781631656082,
+        "precision": 0.9157303370786517,
+        "recall": 0.7086956521739131,
+        "f1": 0.7990196078431373,
+        "tp": 163,
+        "fp": 15,
+        "fn": 67,
+        "tn": 74
+      },
+      "test_metrics": {
+        "accuracy": 72.10031347962382,
+        "balanced_accuracy": 72.9064039408867,
+        "precision": 0.8352941176470589,
+        "recall": 0.6995073891625616,
+        "f1": 0.7613941018766758,
+        "tp": 142,
+        "fp": 28,
+        "fn": 61,
+        "tn": 88
+      },
+      "config": {}
+    },
+    {
+      "name": "Original 2D CNN + tuned threshold",
+      "model_type": "2d",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": 0.020216703414916992,
+      "valid_loss": 0.29694303274154665,
+      "valid_metrics": {
+        "accuracy": 74.60815047021944,
+        "balanced_accuracy": 77.5696140693698,
+        "precision": 0.9209039548022598,
+        "recall": 0.7086956521739131,
+        "f1": 0.800982800982801,
+        "tp": 163,
+        "fp": 14,
+        "fn": 67,
+        "tn": 75
+      },
+      "test_metrics": {
+        "accuracy": 72.10031347962382,
+        "balanced_accuracy": 72.9064039408867,
+        "precision": 0.8352941176470589,
+        "recall": 0.6995073891625616,
+        "f1": 0.7613941018766758,
+        "tp": 142,
+        "fp": 28,
+        "fn": 61,
+        "tn": 88
+      },
+      "config": {}
+    },
+    {
+      "name": "Main hybrid: hybrid norm=log_block lr=0.001 wd=0.0001 dropout=0.25 channels=16/8 hidden=64",
+      "model_type": "hybrid",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": 0.018379688262939453,
+      "valid_loss": 0.2973612308502197,
+      "valid_metrics": {
+        "accuracy": 75.54858934169279,
+        "balanced_accuracy": 77.87738153395213,
+        "precision": 0.9175824175824175,
+        "recall": 0.7260869565217392,
+        "f1": 0.8106796116504855,
+        "tp": 167,
+        "fp": 15,
+        "fn": 63,
+        "tn": 74
+      },
+      "test_metrics": {
+        "accuracy": 68.65203761755485,
+        "balanced_accuracy": 69.45812807881772,
+        "precision": 0.8083832335329342,
+        "recall": 0.6650246305418719,
+        "f1": 0.7297297297297297,
+        "tp": 135,
+        "fp": 32,
+        "fn": 68,
+        "tn": 84
+      },
+      "config": {
+        "norm": "log_block",
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "dropout": 0.25,
+        "wls_channels": 16,
+        "small_channels": 8,
+        "hidden_dim": 64,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune hybrid: hybrid norm=raw lr=0.001 wd=0 dropout=0.25 channels=16/8 hidden=64",
+      "model_type": "hybrid",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": 0.09318089485168457,
+      "valid_loss": 0.2916680037975311,
+      "valid_metrics": {
+        "accuracy": 73.98119122257053,
+        "balanced_accuracy": 77.82364435759648,
+        "precision": 0.9298245614035088,
+        "recall": 0.691304347826087,
+        "f1": 0.7930174563591023,
+        "tp": 159,
+        "fp": 12,
+        "fn": 71,
+        "tn": 77
+      },
+      "test_metrics": {
+        "accuracy": 72.10031347962382,
+        "balanced_accuracy": 73.27586206896552,
+        "precision": 0.8433734939759037,
+        "recall": 0.6896551724137931,
+        "f1": 0.7588075880758808,
+        "tp": 140,
+        "fp": 26,
+        "fn": 63,
+        "tn": 90
+      },
+      "config": {
+        "norm": "raw",
+        "lr": 0.001,
+        "weight_decay": 0.0,
+        "dropout": 0.25,
+        "wls_channels": 16,
+        "small_channels": 8,
+        "hidden_dim": 64,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune hybrid: hybrid norm=log1p lr=0.001 wd=0.0001 dropout=0.25 channels=16/8 hidden=64",
+      "model_type": "hybrid",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": -0.008589506149291992,
+      "valid_loss": 0.29337018728256226,
+      "valid_metrics": {
+        "accuracy": 75.86206896551724,
+        "balanced_accuracy": 77.40595994137762,
+        "precision": 0.9090909090909091,
+        "recall": 0.7391304347826086,
+        "f1": 0.8153477218225419,
+        "tp": 170,
+        "fp": 17,
+        "fn": 60,
+        "tn": 72
+      },
+      "test_metrics": {
+        "accuracy": 68.96551724137932,
+        "balanced_accuracy": 69.51970443349754,
+        "precision": 0.8058823529411765,
+        "recall": 0.6748768472906403,
+        "f1": 0.7345844504021448,
+        "tp": 137,
+        "fp": 33,
+        "fn": 66,
+        "tn": 83
+      },
+      "config": {
+        "norm": "log1p",
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "dropout": 0.25,
+        "wls_channels": 16,
+        "small_channels": 8,
+        "hidden_dim": 64,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune hybrid: hybrid norm=log_block lr=0.001 wd=0.0001 dropout=0.25 channels=16/8 hidden=64",
+      "model_type": "hybrid",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": 0.018379688262939453,
+      "valid_loss": 0.2973612308502197,
+      "valid_metrics": {
+        "accuracy": 75.54858934169279,
+        "balanced_accuracy": 77.87738153395213,
+        "precision": 0.9175824175824175,
+        "recall": 0.7260869565217392,
+        "f1": 0.8106796116504855,
+        "tp": 167,
+        "fp": 15,
+        "fn": 63,
+        "tn": 74
+      },
+      "test_metrics": {
+        "accuracy": 68.65203761755485,
+        "balanced_accuracy": 69.45812807881772,
+        "precision": 0.8083832335329342,
+        "recall": 0.6650246305418719,
+        "f1": 0.7297297297297297,
+        "tp": 135,
+        "fp": 32,
+        "fn": 68,
+        "tn": 84
+      },
+      "config": {
+        "norm": "log_block",
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "dropout": 0.25,
+        "wls_channels": 16,
+        "small_channels": 8,
+        "hidden_dim": 64,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune hybrid: hybrid norm=log_block lr=0.0003 wd=0.0001 dropout=0.25 channels=16/8 hidden=64",
+      "model_type": "hybrid",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": 0.17900872230529785,
+      "valid_loss": 0.2974916577339172,
+      "valid_metrics": {
+        "accuracy": 71.47335423197492,
+        "balanced_accuracy": 76.42892037127504,
+        "precision": 0.9316770186335404,
+        "recall": 0.6521739130434783,
+        "f1": 0.7672634271099744,
+        "tp": 150,
+        "fp": 11,
+        "fn": 80,
+        "tn": 78
+      },
+      "test_metrics": {
+        "accuracy": 68.3385579937304,
+        "balanced_accuracy": 70.50492610837438,
+        "precision": 0.8355263157894737,
+        "recall": 0.625615763546798,
+        "f1": 0.7154929577464788,
+        "tp": 127,
+        "fp": 25,
+        "fn": 76,
+        "tn": 91
+      },
+      "config": {
+        "norm": "log_block",
+        "lr": 0.0003,
+        "weight_decay": 0.0001,
+        "dropout": 0.25,
+        "wls_channels": 16,
+        "small_channels": 8,
+        "hidden_dim": 64,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune hybrid: hybrid norm=log_block lr=0.001 wd=0.0001 dropout=0.4 channels=16/8 hidden=64",
+      "model_type": "hybrid",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": 0.02745962142944336,
+      "valid_loss": 0.2976995050907135,
+      "valid_metrics": {
+        "accuracy": 73.98119122257053,
+        "balanced_accuracy": 77.4792379091353,
+        "precision": 0.9248554913294798,
+        "recall": 0.6956521739130435,
+        "f1": 0.794044665012407,
+        "tp": 160,
+        "fp": 13,
+        "fn": 70,
+        "tn": 76
+      },
+      "test_metrics": {
+        "accuracy": 69.59247648902821,
+        "balanced_accuracy": 70.7512315270936,
+        "precision": 0.823170731707317,
+        "recall": 0.6650246305418719,
+        "f1": 0.7356948228882834,
+        "tp": 135,
+        "fp": 29,
+        "fn": 68,
+        "tn": 87
+      },
+      "config": {
+        "norm": "log_block",
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "dropout": 0.4,
+        "wls_channels": 16,
+        "small_channels": 8,
+        "hidden_dim": 64,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune hybrid: hybrid norm=event_fraction lr=0.001 wd=0.0001 dropout=0.25 channels=16/8 hidden=64",
+      "model_type": "hybrid",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": 0.004761934280395508,
+      "valid_loss": 0.29721878170967103,
+      "valid_metrics": {
+        "accuracy": 71.78683385579937,
+        "balanced_accuracy": 76.64631167562285,
+        "precision": 0.9320987654320988,
+        "recall": 0.6565217391304348,
+        "f1": 0.7704081632653061,
+        "tp": 151,
+        "fp": 11,
+        "fn": 79,
+        "tn": 78
+      },
+      "test_metrics": {
+        "accuracy": 67.7115987460815,
+        "balanced_accuracy": 69.82758620689656,
+        "precision": 0.8289473684210527,
+        "recall": 0.6206896551724138,
+        "f1": 0.7098591549295776,
+        "tp": 126,
+        "fp": 26,
+        "fn": 77,
+        "tn": 90
+      },
+      "config": {
+        "norm": "event_fraction",
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "dropout": 0.25,
+        "wls_channels": 16,
+        "small_channels": 8,
+        "hidden_dim": 64,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune hybrid: hybrid norm=log_block lr=0.001 wd=0.0001 dropout=0.25 channels=32/16 hidden=96",
+      "model_type": "hybrid",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": -0.34936070442199707,
+      "valid_loss": 0.2975019454956055,
+      "valid_metrics": {
+        "accuracy": 77.74294670846395,
+        "balanced_accuracy": 76.98827552515877,
+        "precision": 0.8916256157635468,
+        "recall": 0.7869565217391304,
+        "f1": 0.836027713625866,
+        "tp": 181,
+        "fp": 22,
+        "fn": 49,
+        "tn": 67
+      },
+      "test_metrics": {
+        "accuracy": 69.59247648902821,
+        "balanced_accuracy": 68.53448275862068,
+        "precision": 0.7819148936170213,
+        "recall": 0.7241379310344828,
+        "f1": 0.7519181585677749,
+        "tp": 147,
+        "fp": 41,
+        "fn": 56,
+        "tn": 75
+      },
+      "config": {
+        "norm": "log_block",
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "dropout": 0.25,
+        "wls_channels": 32,
+        "small_channels": 16,
+        "hidden_dim": 96,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune 2d: 2d norm=raw lr=0.001 wd=0 dropout=0.25 channels=16/8 hidden=64",
+      "model_type": "2d",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": 0.009476423263549805,
+      "valid_loss": 0.29275007247924806,
+      "valid_metrics": {
+        "accuracy": 73.35423197492163,
+        "balanced_accuracy": 77.04445530043967,
+        "precision": 0.9239766081871345,
+        "recall": 0.6869565217391305,
+        "f1": 0.7880299251870323,
+        "tp": 158,
+        "fp": 13,
+        "fn": 72,
+        "tn": 76
+      },
+      "test_metrics": {
+        "accuracy": 73.04075235109718,
+        "balanced_accuracy": 73.83004926108374,
+        "precision": 0.8421052631578947,
+        "recall": 0.7093596059113301,
+        "f1": 0.770053475935829,
+        "tp": 144,
+        "fp": 27,
+        "fn": 59,
+        "tn": 89
+      },
+      "config": {
+        "norm": "raw",
+        "lr": 0.001,
+        "weight_decay": 0.0,
+        "dropout": 0.25,
+        "wls_channels": 16,
+        "small_channels": 8,
+        "hidden_dim": 64,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune 2d: 2d norm=log1p lr=0.001 wd=0.0001 dropout=0.25 channels=16/8 hidden=64",
+      "model_type": "2d",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": 0.28954291343688965,
+      "valid_loss": 0.30960512161254883,
+      "valid_metrics": {
+        "accuracy": 69.90595611285266,
+        "balanced_accuracy": 74.99755740107474,
+        "precision": 0.9240506329113924,
+        "recall": 0.6347826086956522,
+        "f1": 0.7525773195876289,
+        "tp": 146,
+        "fp": 12,
+        "fn": 84,
+        "tn": 77
+      },
+      "test_metrics": {
+        "accuracy": 67.7115987460815,
+        "balanced_accuracy": 70.93596059113301,
+        "precision": 0.8571428571428571,
+        "recall": 0.5911330049261084,
+        "f1": 0.6997084548104956,
+        "tp": 120,
+        "fp": 20,
+        "fn": 83,
+        "tn": 96
+      },
+      "config": {
+        "norm": "log1p",
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "dropout": 0.25,
+        "wls_channels": 16,
+        "small_channels": 8,
+        "hidden_dim": 64,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune 2d: 2d norm=log_block lr=0.001 wd=0.0001 dropout=0.25 channels=16/8 hidden=64",
+      "model_type": "2d",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": -0.07849574089050293,
+      "valid_loss": 0.3131765365600586,
+      "valid_metrics": {
+        "accuracy": 73.35423197492163,
+        "balanced_accuracy": 74.28920371275036,
+        "precision": 0.8877005347593583,
+        "recall": 0.7217391304347827,
+        "f1": 0.7961630695443646,
+        "tp": 166,
+        "fp": 21,
+        "fn": 64,
+        "tn": 68
+      },
+      "test_metrics": {
+        "accuracy": 66.77115987460814,
+        "balanced_accuracy": 67.61083743842364,
+        "precision": 0.793939393939394,
+        "recall": 0.645320197044335,
+        "f1": 0.7119565217391304,
+        "tp": 131,
+        "fp": 34,
+        "fn": 72,
+        "tn": 82
+      },
+      "config": {
+        "norm": "log_block",
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "dropout": 0.25,
+        "wls_channels": 16,
+        "small_channels": 8,
+        "hidden_dim": 64,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune 2d: 2d norm=log_block lr=0.0003 wd=0.0001 dropout=0.25 channels=16/8 hidden=64",
+      "model_type": "2d",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": -0.33635854721069336,
+      "valid_loss": 0.31365649700164794,
+      "valid_metrics": {
+        "accuracy": 76.17554858934169,
+        "balanced_accuracy": 74.52369320957499,
+        "precision": 0.8737864077669902,
+        "recall": 0.782608695652174,
+        "f1": 0.8256880733944955,
+        "tp": 180,
+        "fp": 26,
+        "fn": 50,
+        "tn": 63
+      },
+      "test_metrics": {
+        "accuracy": 68.3385579937304,
+        "balanced_accuracy": 68.10344827586208,
+        "precision": 0.7865168539325843,
+        "recall": 0.6896551724137931,
+        "f1": 0.7349081364829396,
+        "tp": 140,
+        "fp": 38,
+        "fn": 63,
+        "tn": 78
+      },
+      "config": {
+        "norm": "log_block",
+        "lr": 0.0003,
+        "weight_decay": 0.0001,
+        "dropout": 0.25,
+        "wls_channels": 16,
+        "small_channels": 8,
+        "hidden_dim": 64,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune 2d: 2d norm=log_block lr=0.001 wd=0.0001 dropout=0.4 channels=16/8 hidden=64",
+      "model_type": "2d",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": -0.11498689651489258,
+      "valid_loss": 0.3129863977432251,
+      "valid_metrics": {
+        "accuracy": 73.35423197492163,
+        "balanced_accuracy": 73.60039081582805,
+        "precision": 0.8795811518324608,
+        "recall": 0.7304347826086957,
+        "f1": 0.7980997624703088,
+        "tp": 168,
+        "fp": 23,
+        "fn": 62,
+        "tn": 66
+      },
+      "test_metrics": {
+        "accuracy": 67.39811912225706,
+        "balanced_accuracy": 67.91871921182266,
+        "precision": 0.7928994082840237,
+        "recall": 0.6600985221674877,
+        "f1": 0.7204301075268817,
+        "tp": 134,
+        "fp": 35,
+        "fn": 69,
+        "tn": 81
+      },
+      "config": {
+        "norm": "log_block",
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "dropout": 0.4,
+        "wls_channels": 16,
+        "small_channels": 8,
+        "hidden_dim": 64,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune 2d: 2d norm=event_fraction lr=0.001 wd=0.0001 dropout=0.25 channels=16/8 hidden=64",
+      "model_type": "2d",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": -0.10084497928619385,
+      "valid_loss": 0.3741397798061371,
+      "valid_metrics": {
+        "accuracy": 70.84639498432603,
+        "balanced_accuracy": 67.72838299951148,
+        "precision": 0.8309178743961353,
+        "recall": 0.7478260869565218,
+        "f1": 0.7871853546910754,
+        "tp": 172,
+        "fp": 35,
+        "fn": 58,
+        "tn": 54
+      },
+      "test_metrics": {
+        "accuracy": 63.322884012539184,
+        "balanced_accuracy": 60.652709359605915,
+        "precision": 0.715,
+        "recall": 0.7044334975369458,
+        "f1": 0.7096774193548387,
+        "tp": 143,
+        "fp": 57,
+        "fn": 60,
+        "tn": 59
+      },
+      "config": {
+        "norm": "event_fraction",
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "dropout": 0.25,
+        "wls_channels": 16,
+        "small_channels": 8,
+        "hidden_dim": 64,
+        "epochs": 20
+      }
+    },
+    {
+      "name": "Tune 2d: 2d norm=log_block lr=0.001 wd=0.0001 dropout=0.25 channels=32/16 hidden=96",
+      "model_type": "2d",
+      "tuned": true,
+      "threshold_metric": "balanced",
+      "selected_threshold": 0.29181790351867676,
+      "valid_loss": 0.31386391520500184,
+      "valid_metrics": {
+        "accuracy": 70.53291536050156,
+        "balanced_accuracy": 74.74352711284806,
+        "precision": 0.9146341463414634,
+        "recall": 0.6521739130434783,
+        "f1": 0.7614213197969543,
+        "tp": 150,
+        "fp": 14,
+        "fn": 80,
+        "tn": 75
+      },
+      "test_metrics": {
+        "accuracy": 66.77115987460814,
+        "balanced_accuracy": 69.27339901477832,
+        "precision": 0.8299319727891157,
+        "recall": 0.6009852216748769,
+        "f1": 0.6971428571428573,
+        "tp": 122,
+        "fp": 25,
+        "fn": 81,
+        "tn": 91
+      },
+      "config": {
+        "norm": "log_block",
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "dropout": 0.25,
+        "wls_channels": 32,
+        "small_channels": 16,
+        "hidden_dim": 96,
+        "epochs": 20
+      }
+    }
+  ]
+}

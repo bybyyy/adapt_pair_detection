@@ -22,6 +22,22 @@ from train_2d_cnn import (
 )
 
 
+# What this file does:
+# - Reuses the data loading, splitting, CNN tensor reshaping, training loop, and metrics
+#   from train_2d_cnn.py.
+# - Trains the original MLP baseline for comparison.
+# - Trains a hybrid model that combines CNN detector features with engineered scalar features.
+#
+# When to run:
+#   python train_hybrid_cnn.py <datafile1> [<datafile2> ...]
+#
+# Main parameters to change:
+# - Shared BATCH_SIZE, EPOCHS, SEED, and LR live in train_2d_cnn.py.
+# - The hybrid classifier size/dropout are defined in PairEventHybridCNN below.
+# - The list of engineered scalar features is defined in make_engineered_features().
+
+
+# CNN-plus-engineered-feature classifier for binary pair/non-pair prediction.
 class PairEventHybridCNN(nn.Module):
     def __init__(self, engineered_dim):
         super().__init__()
@@ -38,6 +54,10 @@ class PairEventHybridCNN(nn.Module):
         return self.classifier(torch.cat([cnn_features, engineered], dim=1)).squeeze(-1)
 
 
+# Build hand-engineered scalar features from the flat detector vector.
+# These features summarize total activity, detector-block activity, active WLS bins,
+# and simple ratios. Mean/std normalization is fit on train_indices only to avoid
+# leaking validation/test statistics into training.
 def make_engineered_features(features, train_indices):
     fast_end = WLS_FAST_COUNT
     slow_end = fast_end + WLS_SLOW_COUNT
@@ -78,6 +98,7 @@ def make_engineered_features(features, train_indices):
     return (engineered - mean) / std
 
 
+# Train and evaluate the hybrid model on CNN tensors plus engineered scalar features.
 def train_hybrid_cnn(features, labels, train_indices, valid_indices, test_indices, pos_weight):
     wls, small = make_detector_tensors(features)
     engineered = make_engineered_features(features, train_indices)
@@ -94,6 +115,7 @@ def train_hybrid_cnn(features, labels, train_indices, valid_indices, test_indice
     return evaluate_model(model, test_loader)
 
 
+# Script entry point: load data, make the split, train MLP and hybrid models, and compare metrics.
 def main():
     if len(sys.argv) < 2:
         print("Usage: python train_hybrid_cnn.py <datafile1> [<datafile2> ...]")
