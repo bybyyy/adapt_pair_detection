@@ -192,7 +192,8 @@ python build_apt_pair_dataset.py \
   --energy-mev 5 --seed 5005 --run-id 5MeV_seed_5005 \
   --pipeline-config /path/to/apt_pipeline/config/pair_detection/apt_pair_5mev.config \
   --effective-config-log /data/apt/5MeV/seed_5005/digitizer.log \
-  --pipeline-repo /path/to/apt_pipeline
+  --pipeline-repo /path/to/apt_pipeline \
+  --exclude-missing-csi-truth
 
 python validate_apt_pair_dataset.py \
   /data/apt/datasets/5MeV_seed_5005.metadata.json \
@@ -215,6 +216,9 @@ python train_apt_pair_models.py /data/apt/datasets/manifest.json \
 The tensor shape is `[events, 4, 20, 1492]`, ordered as WLS-fast X/Y followed
 by WLS-slow X/Y. Labels are pair when any CsI truth hit has creator process
 `conv`. Tracker, gun, edge-detector, and calorimeter rows never enter the tensor.
+Digitized WLS events without any CsI truth row are excluded without receiving a
+label when `--exclude-missing-csi-truth` is explicitly supplied; the number
+excluded is recorded in metadata.
 The trainer requires 500 events of each class per energy by default; append
 another 6,400-event seed-run when that threshold is not met. Override
 `--min-class-count-per-energy` only for a smoke test.

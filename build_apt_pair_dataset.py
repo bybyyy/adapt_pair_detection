@@ -161,9 +161,19 @@ def convert(args):
 
     pair_ids, truth_event_ids, csi_truth_rows = read_pair_truth(csi_truth, gun_event_ids)
     missing_csi = seen_events - truth_event_ids
-    if missing_csi:
+    if missing_csi and not args.exclude_missing_csi_truth:
         sample = sorted(missing_csi)[:10]
-        raise ValueError(f"Digitized WLS event IDs missing from CsI truth: {sample}")
+        raise ValueError(
+            f"Digitized WLS event IDs missing from CsI truth: {sample}; "
+            "use --exclude-missing-csi-truth to omit them without assigning a label"
+        )
+    if missing_csi:
+        ordered_event_ids = [
+            event_id for event_id in ordered_event_ids if event_id in truth_event_ids
+        ]
+        seen_events = set(ordered_event_ids)
+        if not ordered_event_ids:
+            raise ValueError("No digitized WLS events have CsI truth")
 
     event_ids = np.asarray(ordered_event_ids, dtype=np.int64)
     labels = np.asarray([event_id in pair_ids for event_id in ordered_event_ids], dtype=np.uint8)
@@ -187,10 +197,14 @@ def convert(args):
         paths["features"], mode="w+", dtype=np.float32, shape=shape
     )
     features[:] = 0
+    included_wls_rows = 0
     for event_id, map_index, layer, channel, signal in native_wls_rows(
         digitizer, args.layers, args.channels
     ):
+        if event_id not in event_index:
+            continue
         features[event_index[event_id], map_index, layer, channel] = signal
+        included_wls_rows += 1
     features.flush()
     del features
 
@@ -217,12 +231,17 @@ def convert(args):
             "pair_rule": "any CsIout row with creator process 'conv'",
             "csi_truth_rows": csi_truth_rows,
             "csi_truth_events": len(truth_event_ids),
+            "missing_csi_policy": (
+                "excluded_without_label" if missing_csi else "no_missing_events"
+            ),
         },
         "counts": {
             "events": len(event_ids),
             "pair": pair_count,
             "nonpair": nonpair_count,
-            "wls_rows": wls_row_count,
+            "wls_rows": included_wls_rows,
+            "source_wls_rows": wls_row_count,
+            "excluded_missing_csi_truth": len(missing_csi),
         },
         "arrays": {key: path.name for key, path in paths.items() if key != "metadata"},
         "sources": {
@@ -270,6 +289,11 @@ def parse_args():
     parser.add_argument("--channels", type=int, default=1492)
     parser.add_argument("--min-class-count", type=int, default=1)
     parser.add_argument("--allow-single-class", action="store_true")
+    parser.add_argument(
+        "--exclude-missing-csi-truth",
+        action="store_true",
+        help="Explicitly omit digitized WLS events that have no CsI truth row.",
+    )
     return parser.parse_args()
 
 

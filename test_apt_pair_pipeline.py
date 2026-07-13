@@ -69,6 +69,7 @@ class AptPairDatasetTests(unittest.TestCase):
             channels=3,
             min_class_count=1,
             allow_single_class=False,
+            exclude_missing_csi_truth=False,
         )
         convert(args)
         return output_paths(prefix)["metadata"]
@@ -107,6 +108,7 @@ class AptPairDatasetTests(unittest.TestCase):
             channels=3,
             min_class_count=1,
             allow_single_class=False,
+            exclude_missing_csi_truth=False,
         )
         with self.assertRaisesRegex(ValueError, "missing from CsI truth"):
             convert(args)
