@@ -14,3 +14,10 @@ classifier_data_10MeV.txt
 classifier_data_50MeV.txt
 data_range.txt
 more_data.txt
+
+# APT arrays are multi-gigabyte local artifacts. Keep JSON metadata/manifests.
+*.features.npy
+*.labels.npy
+*.event_ids.npy
+*.energy_mev.npy
+apt_benchmarks/

@@ -10,6 +10,7 @@ from train_2d_cnn import (
     LR,
     SEED,
     DetectorBackbone,
+    WLSOnlyBackbone,
     evaluate_model,
     load_events,
     make_detector_tensors,
@@ -51,6 +52,72 @@ class PairEventHybridCNN(nn.Module):
 
     def forward(self, wls, small, engineered):
         cnn_features = self.backbone(wls, small)
+        return self.classifier(torch.cat([cnn_features, engineered], dim=1)).squeeze(-1)
+
+
+def make_apt_wls_engineered_features(wls):
+    """Compute WLS-only event summaries without edge or calorimeter leakage."""
+    if wls.ndim != 4 or wls.shape[1] != 4:
+        raise ValueError(f"Expected WLS tensor [batch, 4, layers, channels], got {tuple(wls.shape)}")
+
+    fast = wls[:, :2]
+    slow = wls[:, 2:]
+    total = wls.sum(dim=(1, 2, 3))
+    fast_total = fast.sum(dim=(1, 2, 3))
+    slow_total = slow.sum(dim=(1, 2, 3))
+    active = (wls > 0).any(dim=1)
+    active_channels = active.sum(dim=(1, 2)).float()
+    layer_signal = wls.sum(dim=(1, 3))
+    active_layers = (layer_signal > 0).sum(dim=1).float()
+
+    layer_positions = torch.linspace(0.0, 1.0, wls.shape[2], device=wls.device)
+    layer_weights = layer_signal / total[:, None].clamp_min(1e-9)
+    layer_centroid = (layer_weights * layer_positions).sum(dim=1)
+    layer_spread = torch.sqrt(
+        (layer_weights * (layer_positions - layer_centroid[:, None]).square()).sum(dim=1).clamp_min(0.0)
+    )
+    peak_layer_fraction = layer_signal.max(dim=1).values / total.clamp_min(1e-9)
+    x_total = wls[:, [0, 2]].sum(dim=(1, 2, 3))
+    y_total = wls[:, [1, 3]].sum(dim=(1, 2, 3))
+    xy_imbalance = (x_total - y_total).abs() / total.clamp_min(1e-9)
+
+    return torch.stack(
+        [
+            torch.log1p(total),
+            torch.log1p(fast_total),
+            torch.log1p(slow_total),
+            torch.log1p(active_channels),
+            slow_total / total.clamp_min(1e-9),
+            fast_total / total.clamp_min(1e-9),
+            torch.log1p(active_layers),
+            layer_centroid,
+            layer_spread,
+            peak_layer_fraction,
+            xy_imbalance,
+        ],
+        dim=1,
+    )
+
+
+class PairEventAPTHybridCNN(nn.Module):
+    """APT WLS CNN augmented with longitudinal and occupancy summaries."""
+
+    engineered_dim = 11
+
+    def __init__(self, channels=16, hidden_dim=128, dropout=0.25):
+        super().__init__()
+        self.backbone = WLSOnlyBackbone(channels=channels)
+        self.engineered_norm = nn.LayerNorm(self.engineered_dim)
+        self.classifier = nn.Sequential(
+            nn.Linear(self.backbone.output_dim + self.engineered_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(p=dropout),
+            nn.Linear(hidden_dim, 1),
+        )
+
+    def forward(self, wls):
+        cnn_features = self.backbone(wls)
+        engineered = self.engineered_norm(make_apt_wls_engineered_features(wls))
         return self.classifier(torch.cat([cnn_features, engineered], dim=1)).squeeze(-1)
 
 

@@ -31,6 +31,10 @@ Additional work added on top of that base includes:
 | `train_hybrid_cnn.py` | Trains the original MLP baseline and a hybrid CNN with engineered features. |
 | `train_threshold_norm_tune.py` | Runs normalization, threshold, and small hyperparameter sweeps for 2D/hybrid CNNs. |
 | `benchmark_pair_detection.py` | Runs the staged benchmark suite and writes JSON, CSV, and Markdown reports. |
+| `build_apt_pair_dataset.py` | Joins native digitizer WLS rows to Geant pair truth and writes memory-mapped arrays. |
+| `build_apt_manifest.py` | Combines independent APT seed-runs without copying feature arrays. |
+| `validate_apt_pair_dataset.py` | Checks APT geometry, labels, truth, signals, and effective configuration. |
+| `train_apt_pair_models.py` | Trains WLS-only APT CNN/hybrid models with run-isolated evaluation. |
 
 ## Data Availability
 
@@ -173,3 +177,48 @@ python compare_pair_nonpair_plots.py <datafile1> --show
 - Keep local data files outside git or under the ignored names in `.gitignore`.
 - Commit code and documentation changes separately from generated plots or datasets.
 - If large data needs to be shared later, use a separate data release, cloud storage location, or Git LFS after confirming project policy.
+
+## APT WLS-only workflow
+
+The APT path is separate from the legacy four-layer ADAPT parser above. Convert
+each energy/seed run after the pipeline's Geant and digitizer passes:
+
+```bash
+python build_apt_pair_dataset.py \
+  --digitizer /data/apt/5MeV/seed_5005/digitizer_final.txt \
+  --csi-truth /data/apt/5MeV/seed_5005/source_particle/CsIout_tmp.dat \
+  --gun-truth /data/apt/5MeV/seed_5005/source_particle/GUNout_tmp.dat \
+  --output-prefix /data/apt/datasets/5MeV_seed_5005 \
+  --energy-mev 5 --seed 5005 --run-id 5MeV_seed_5005 \
+  --pipeline-config /path/to/apt_pipeline/config/pair_detection/apt_pair_5mev.config \
+  --effective-config-log /data/apt/5MeV/seed_5005/digitizer.log \
+  --pipeline-repo /path/to/apt_pipeline
+
+python validate_apt_pair_dataset.py \
+  /data/apt/datasets/5MeV_seed_5005.metadata.json \
+  --config-log /data/apt/5MeV/seed_5005/digitizer.log
+```
+
+Generate at least three independent seed-runs per energy. This allows the
+trainer to keep entire simulation runs in one partition while retaining all
+three energies in train, validation, and test. Build one manifest over all run
+metadata files, then train:
+
+```bash
+python build_apt_manifest.py /data/apt/datasets/*.metadata.json \
+  --output /data/apt/datasets/manifest.json
+
+python train_apt_pair_models.py /data/apt/datasets/manifest.json \
+  --outdir apt_benchmarks
+```
+
+The tensor shape is `[events, 4, 20, 1492]`, ordered as WLS-fast X/Y followed
+by WLS-slow X/Y. Labels are pair when any CsI truth hit has creator process
+`conv`. Tracker, gun, edge-detector, and calorimeter rows never enter the tensor.
+The trainer requires 500 events of each class per energy by default; append
+another 6,400-event seed-run when that threshold is not met. Override
+`--min-class-count-per-energy` only for a smoke test.
+
+The historical ADAPT report remains a useful reference, but it used WLS,
+edge-detector, and calorimeter inputs. It is therefore not an apples-to-apples
+comparison with these WLS-only APT models.

@@ -132,6 +132,47 @@ class PairEvent2DCNN(nn.Module):
         return self.classifier(self.backbone(wls, small)).squeeze(-1)
 
 
+class WLSOnlyBackbone(nn.Module):
+    """Geometry-independent WLS feature extractor for the 20-layer APT maps."""
+
+    def __init__(self, channels=16, pooled_shape=(4, 8)):
+        super().__init__()
+        self.output_dim = channels * 2 * pooled_shape[0] * pooled_shape[1]
+        self.branch = nn.Sequential(
+            nn.Conv2d(4, channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(channels),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=(1, 4)),
+            nn.Conv2d(channels, channels * 2, kernel_size=3, padding=1),
+            nn.BatchNorm2d(channels * 2),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d(pooled_shape),
+        )
+
+    def forward(self, wls):
+        if wls.ndim != 4 or wls.shape[1] != 4:
+            raise ValueError(f"Expected WLS tensor [batch, 4, layers, channels], got {tuple(wls.shape)}")
+        normalized = torch.log1p(torch.clamp(wls, min=0.0))
+        return self.branch(normalized).flatten(1)
+
+
+class PairEventAPT2DCNN(nn.Module):
+    """APT classifier that deliberately consumes WLS fast/slow maps only."""
+
+    def __init__(self, channels=16, hidden_dim=128, dropout=0.25):
+        super().__init__()
+        self.backbone = WLSOnlyBackbone(channels=channels)
+        self.classifier = nn.Sequential(
+            nn.Linear(self.backbone.output_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(p=dropout),
+            nn.Linear(hidden_dim, 1),
+        )
+
+    def forward(self, wls):
+        return self.classifier(self.backbone(wls)).squeeze(-1)
+
+
 # Generic training loop with validation-loss model selection.
 # To tune training length, change EPOCHS; to tune optimizer behavior, change LR above.
 def train_model(name, model, train_loader, valid_loader, criterion, optimizer):

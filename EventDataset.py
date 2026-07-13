@@ -1,3 +1,7 @@
+import bisect
+import json
+from pathlib import Path
+
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -111,3 +115,106 @@ class EventDataset(Dataset):
     def get_counts(self):
         return (self.pair_count, self.total_count)
 
+
+class _AptDatasetShard:
+    def __init__(self, metadata_path):
+        self.metadata_path = Path(metadata_path).resolve()
+        with self.metadata_path.open() as source:
+            self.metadata = json.load(source)
+        if self.metadata.get("format") != "apt_pair_dataset_v1":
+            raise ValueError(f"Unsupported APT dataset metadata: {self.metadata_path}")
+
+        arrays = self.metadata["arrays"]
+        base = self.metadata_path.parent
+        self.features = np.load(base / arrays["features"], mmap_mode="r")
+        self.labels = np.load(base / arrays["labels"], mmap_mode="r")
+        self.event_ids = np.load(base / arrays["event_ids"], mmap_mode="r")
+        self.energy_mev = np.load(base / arrays["energy_mev"], mmap_mode="r")
+        expected_shape = tuple(self.metadata["geometry"]["feature_shape"])
+        if self.features.shape[1:] != expected_shape:
+            raise ValueError(
+                f"Feature shape mismatch in {self.metadata_path}: "
+                f"{self.features.shape[1:]} != {expected_shape}"
+            )
+        lengths = {len(self.features), len(self.labels), len(self.event_ids), len(self.energy_mev)}
+        if len(lengths) != 1:
+            raise ValueError(f"Array length mismatch in {self.metadata_path}")
+
+    def __len__(self):
+        return len(self.labels)
+
+
+class AptPairDataset(Dataset):
+    """Lazy reader for one APT dataset metadata file or a multi-run manifest."""
+
+    def __init__(self, path):
+        path = Path(path).resolve()
+        with path.open() as source:
+            descriptor = json.load(source)
+
+        if descriptor.get("format") == "apt_pair_dataset_v1":
+            metadata_paths = [path]
+        elif descriptor.get("format") == "apt_pair_manifest_v1":
+            metadata_paths = []
+            for entry in descriptor.get("datasets", []):
+                candidate = Path(entry)
+                if not candidate.is_absolute():
+                    candidate = path.parent / candidate
+                metadata_paths.append(candidate)
+            if not metadata_paths:
+                raise ValueError(f"APT manifest contains no datasets: {path}")
+        else:
+            raise ValueError(f"Unsupported dataset descriptor: {path}")
+
+        self.shards = [_AptDatasetShard(item) for item in metadata_paths]
+        self.geometry = self.shards[0].metadata["geometry"]
+        for shard in self.shards[1:]:
+            if shard.metadata["geometry"] != self.geometry:
+                raise ValueError(f"Geometry mismatch in {shard.metadata_path}")
+
+        self.cumulative_lengths = []
+        total = 0
+        for shard in self.shards:
+            total += len(shard)
+            self.cumulative_lengths.append(total)
+
+        self.labels = np.concatenate([np.asarray(shard.labels) for shard in self.shards])
+        self.energy_mev = np.concatenate([np.asarray(shard.energy_mev) for shard in self.shards])
+        self.event_ids = np.concatenate([np.asarray(shard.event_ids) for shard in self.shards])
+        self.run_ids = np.concatenate(
+            [
+                np.full(len(shard), shard.metadata["run_id"], dtype=object)
+                for shard in self.shards
+            ]
+        )
+        keys = list(zip(self.run_ids.tolist(), self.event_ids.tolist()))
+        if len(keys) != len(set(keys)):
+            raise ValueError("Duplicate (run_id, event_id) keys in APT manifest")
+        self.pair_count = int(self.labels.sum())
+        self.total_count = len(self.labels)
+        print(f"{self.pair_count} pair events out of {self.total_count} total APT events")
+
+    def __len__(self):
+        return self.cumulative_lengths[-1]
+
+    def _locate(self, index):
+        if index < 0:
+            index += len(self)
+        if not 0 <= index < len(self):
+            raise IndexError(index)
+        shard_index = bisect.bisect_right(self.cumulative_lengths, index)
+        start = 0 if shard_index == 0 else self.cumulative_lengths[shard_index - 1]
+        return self.shards[shard_index], index - start
+
+    def __getitem__(self, index):
+        shard, local_index = self._locate(index)
+        features = torch.tensor(shard.features[local_index], dtype=torch.float32)
+        label = torch.tensor(float(shard.labels[local_index]), dtype=torch.float32)
+        energy = torch.tensor(float(shard.energy_mev[local_index]), dtype=torch.float32)
+        return features, label, energy
+
+    def sample_key(self, index):
+        return str(self.run_ids[index]), int(self.event_ids[index])
+
+    def get_counts(self):
+        return self.pair_count, self.total_count
