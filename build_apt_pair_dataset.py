@@ -236,6 +236,7 @@ def convert(args):
             ),
         },
         "counts": {
+            "incident_events": len(gun_event_ids),
             "events": len(event_ids),
             "pair": pair_count,
             "nonpair": nonpair_count,
@@ -246,8 +247,11 @@ def convert(args):
         "arrays": {key: path.name for key, path in paths.items() if key != "metadata"},
         "sources": {
             "digitizer": str(digitizer),
+            "digitizer_sha256": file_sha256(digitizer),
             "csi_truth": str(csi_truth),
+            "csi_truth_sha256": file_sha256(csi_truth),
             "gun_truth": str(gun_truth),
+            "gun_truth_sha256": file_sha256(gun_truth),
             "pipeline_config": str(pipeline_config) if pipeline_config else None,
             "pipeline_config_sha256": file_sha256(pipeline_config) if pipeline_config else None,
             "effective_config_log": (

@@ -187,6 +187,12 @@ class AptPairDataset(Dataset):
                 for shard in self.shards
             ]
         )
+        self.random_seeds = np.concatenate(
+            [
+                np.full(len(shard), shard.metadata["random_seed"], dtype=np.int64)
+                for shard in self.shards
+            ]
+        )
         keys = list(zip(self.run_ids.tolist(), self.event_ids.tolist()))
         if len(keys) != len(set(keys)):
             raise ValueError("Duplicate (run_id, event_id) keys in APT manifest")

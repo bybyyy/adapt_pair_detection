@@ -65,6 +65,46 @@ def stratified_split(labels, energies, run_ids, seed=SEED):
     return tuple(torch.tensor(values, dtype=torch.long) for values in arrays)
 
 
+def campaign_split(labels, energies, run_ids, random_seeds, seed=SEED):
+    """Use seed endings 0-7/8/9 for train/validation/test without run leakage."""
+    rng = np.random.default_rng(seed)
+    partitions = [[], [], []]
+    for energy in sorted(np.unique(energies).tolist()):
+        energy_mask = energies == energy
+        seeds = sorted(set(random_seeds[energy_mask].tolist()))
+        ending_to_seed = {}
+        for random_seed in seeds:
+            ending = int(random_seed) % 10
+            if ending in ending_to_seed:
+                raise ValueError(
+                    f"{energy:g} MeV has multiple runs ending in {ending}: "
+                    f"{ending_to_seed[ending]} and {random_seed}"
+                )
+            ending_to_seed[ending] = random_seed
+        if set(ending_to_seed) != set(range(10)):
+            raise ValueError(
+                f"{energy:g} MeV must contain one run for each seed ending 0-9; "
+                f"found {sorted(ending_to_seed)}"
+            )
+        for random_seed in seeds:
+            ending = int(random_seed) % 10
+            partition = 0 if ending <= 7 else 1 if ending == 8 else 2
+            values = np.flatnonzero(energy_mask & (random_seeds == random_seed))
+            partitions[partition].extend(values.tolist())
+    for values in partitions:
+        rng.shuffle(values)
+    arrays = tuple(np.asarray(values, dtype=np.int64) for values in partitions)
+    validate_partition_classes(arrays, labels, energies)
+    partition_runs = [set(run_ids[values].tolist()) for values in arrays]
+    if not (
+        partition_runs[0].isdisjoint(partition_runs[1])
+        and partition_runs[0].isdisjoint(partition_runs[2])
+        and partition_runs[1].isdisjoint(partition_runs[2])
+    ):
+        raise ValueError("A simulation run appears in more than one partition")
+    return tuple(torch.tensor(values, dtype=torch.long) for values in arrays)
+
+
 def leave_one_energy_out_split(labels, energies, run_ids, held_energy, seed=SEED):
     rng = np.random.default_rng(seed + int(round(float(held_energy) * 10)))
     test = np.flatnonzero(energies == held_energy)
@@ -104,14 +144,19 @@ def class_weight(labels, train_indices, device):
     return torch.tensor([negatives / positives], dtype=torch.float32, device=device)
 
 
-def train_model(model, loaders, labels, train_indices, device, epochs, lr, weight_decay):
+def train_model(
+    model, loaders, labels, train_indices, device, epochs, lr, weight_decay, patience
+):
     train_loader, valid_loader, _ = loaders
     criterion = nn.BCEWithLogitsLoss(pos_weight=class_weight(labels, train_indices, device))
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     best_state = copy.deepcopy(model.state_dict())
     best_loss = float("inf")
+    epochs_without_improvement = 0
+    epochs_trained = 0
 
     for epoch in range(epochs):
+        epochs_trained = epoch + 1
         model.train()
         train_loss = 0.0
         for wls, batch_labels, _ in train_loader:
@@ -139,9 +184,15 @@ def train_model(model, loaders, labels, train_indices, device, epochs, lr, weigh
         if valid_loss < best_loss:
             best_loss = valid_loss
             best_state = copy.deepcopy(model.state_dict())
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= patience:
+                print(f"early stopping after {epochs_trained} epochs")
+                break
 
     model.load_state_dict(best_state)
-    return best_loss
+    return best_loss, epochs_trained
 
 
 def collect_predictions(model, loader, device):
@@ -178,12 +229,52 @@ def metrics_from_counts(tp, fp, fn, tn):
         "balanced_accuracy": 50.0 * (recall + specificity),
         "precision": precision,
         "recall": recall,
+        "specificity": specificity,
         "f1": 2.0 * precision * recall / (precision + recall) if precision + recall else 0.0,
+        "events": total,
+        "pair": tp + fn,
+        "nonpair": tn + fp,
         "tp": tp,
         "fp": fp,
         "fn": fn,
         "tn": tn,
     }
+
+
+def bootstrap_confidence_intervals(tp, fp, fn, tn, seed=SEED, samples=2000):
+    """Stratified binomial intervals derived from the observed confusion counts."""
+    positives = tp + fn
+    negatives = tn + fp
+    if positives == 0 or negatives == 0:
+        return {}
+    rng = np.random.default_rng(seed)
+    sampled_tp = rng.binomial(positives, tp / positives, size=samples)
+    sampled_tn = rng.binomial(negatives, tn / negatives, size=samples)
+    values = {
+        key: []
+        for key in ["accuracy", "balanced_accuracy", "precision", "recall", "specificity", "f1"]
+    }
+    for current_tp, current_tn in zip(sampled_tp, sampled_tn):
+        current = metrics_from_counts(
+            int(current_tp),
+            int(negatives - current_tn),
+            int(positives - current_tp),
+            int(current_tn),
+        )
+        for key in values:
+            values[key].append(current[key])
+    return {
+        key: [float(np.percentile(current, 2.5)), float(np.percentile(current, 97.5))]
+        for key, current in values.items()
+    }
+
+
+def metrics_with_confidence(tp, fp, fn, tn, seed=SEED):
+    metrics = metrics_from_counts(tp, fp, fn, tn)
+    metrics["confidence_intervals_95"] = bootstrap_confidence_intervals(
+        tp, fp, fn, tn, seed=seed
+    )
+    return metrics
 
 
 def select_threshold(logits, labels):
@@ -203,12 +294,12 @@ def evaluate(model, valid_loader, test_loader, device):
     logits, labels, energies = collect_predictions(model, test_loader, device)
     result = {
         "threshold": threshold,
-        "overall": metrics_from_counts(*confusion(logits, labels, threshold)),
+        "overall": metrics_with_confidence(*confusion(logits, labels, threshold)),
         "per_energy": {},
     }
     for energy in sorted(torch.unique(energies).tolist()):
         mask = energies == energy
-        result["per_energy"][f"{energy:g}"] = metrics_from_counts(
+        result["per_energy"][f"{energy:g}"] = metrics_with_confidence(
             *confusion(logits[mask], labels[mask], threshold)
         )
     return result
@@ -232,7 +323,7 @@ def run_experiment(name, dataset, indices, args, device, tag):
     torch.manual_seed(args.seed)
     model = create_model(name).to(device)
     print(f"\nTraining {name} ({tag})")
-    valid_loss = train_model(
+    valid_loss, epochs_trained = train_model(
         model,
         loaders,
         dataset.labels,
@@ -241,9 +332,11 @@ def run_experiment(name, dataset, indices, args, device, tag):
         args.epochs,
         args.lr,
         args.weight_decay,
+        args.patience,
     )
     result = evaluate(model, loaders[1], loaders[2], device)
     result["valid_loss"] = valid_loss
+    result["epochs_trained"] = epochs_trained
     result["partition_counts"] = {
         "train": len(train_indices),
         "validation": len(valid_indices),
@@ -283,22 +376,30 @@ def write_report(payload, path):
                 f"### {name}",
                 "",
                 f"- Balanced accuracy: `{metrics['balanced_accuracy']:.3f}%`",
-                f"- Accuracy: `{metrics['accuracy']:.3f}%`",
-                f"- Precision: `{metrics['precision']:.4f}`",
-                f"- Recall: `{metrics['recall']:.4f}`",
-                f"- F1: `{metrics['f1']:.4f}`",
+                f"- 95% interval: `{metrics['confidence_intervals_95']['balanced_accuracy'][0]:.3f}%–{metrics['confidence_intervals_95']['balanced_accuracy'][1]:.3f}%`",
+                f"- Accuracy: `{metrics['accuracy']:.3f}%` (95% CI `{metrics['confidence_intervals_95']['accuracy'][0]:.3f}%–{metrics['confidence_intervals_95']['accuracy'][1]:.3f}%`)",
+                f"- Precision: `{metrics['precision']:.4f}` (95% CI `{metrics['confidence_intervals_95']['precision'][0]:.4f}–{metrics['confidence_intervals_95']['precision'][1]:.4f}`)",
+                f"- Pair recall: `{metrics['recall']:.4f}` (95% CI `{metrics['confidence_intervals_95']['recall'][0]:.4f}–{metrics['confidence_intervals_95']['recall'][1]:.4f}`)",
+                f"- Non-pair specificity: `{metrics['specificity']:.4f}` (95% CI `{metrics['confidence_intervals_95']['specificity'][0]:.4f}–{metrics['confidence_intervals_95']['specificity'][1]:.4f}`)",
+                f"- F1: `{metrics['f1']:.4f}` (95% CI `{metrics['confidence_intervals_95']['f1'][0]:.4f}–{metrics['confidence_intervals_95']['f1'][1]:.4f}`)",
                 f"- Confusion counts: `TP={metrics['tp']}, FP={metrics['fp']}, FN={metrics['fn']}, TN={metrics['tn']}`",
                 "",
-                "| Energy (MeV) | Events | Pair | Non-pair | Balanced accuracy | Precision | Recall | F1 | Confusion (TP/FP/FN/TN) |",
-                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| Energy (MeV) | Test events | Pair | Non-pair | Usable/generated | Balanced accuracy (95% CI) | Precision (95% CI) | Pair recall (95% CI) | Specificity (95% CI) | F1 (95% CI) | Confusion (TP/FP/FN/TN) |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
             ]
         )
         for energy, energy_metrics in result["per_energy"].items():
             counts = payload["class_counts"][energy]
             lines.append(
-                f"| {energy} | {counts['events']} | {counts['pair']} | {counts['nonpair']} | "
-                f"{energy_metrics['balanced_accuracy']:.3f}% | {energy_metrics['precision']:.4f} | "
-                f"{energy_metrics['recall']:.4f} | {energy_metrics['f1']:.4f} | "
+                f"| {energy} | {energy_metrics['events']} | {energy_metrics['pair']} | {energy_metrics['nonpair']} | "
+                f"{counts['events']}/{counts['incident_events']} ({100.0 * counts['usable_efficiency']:.2f}%) | "
+                f"{energy_metrics['balanced_accuracy']:.3f}% "
+                f"({energy_metrics['confidence_intervals_95']['balanced_accuracy'][0]:.3f}%–"
+                f"{energy_metrics['confidence_intervals_95']['balanced_accuracy'][1]:.3f}%) | "
+                f"{energy_metrics['precision']:.4f} ({energy_metrics['confidence_intervals_95']['precision'][0]:.4f}–{energy_metrics['confidence_intervals_95']['precision'][1]:.4f}) | "
+                f"{energy_metrics['recall']:.4f} ({energy_metrics['confidence_intervals_95']['recall'][0]:.4f}–{energy_metrics['confidence_intervals_95']['recall'][1]:.4f}) | "
+                f"{energy_metrics['specificity']:.4f} ({energy_metrics['confidence_intervals_95']['specificity'][0]:.4f}–{energy_metrics['confidence_intervals_95']['specificity'][1]:.4f}) | "
+                f"{energy_metrics['f1']:.4f} ({energy_metrics['confidence_intervals_95']['f1'][0]:.4f}–{energy_metrics['confidence_intervals_95']['f1'][1]:.4f}) | "
                 f"{energy_metrics['tp']}/{energy_metrics['fp']}/{energy_metrics['fn']}/{energy_metrics['tn']} |"
             )
         lines.append("")
@@ -321,7 +422,9 @@ def write_report(payload, path):
             (
                 "The historical ADAPT benchmark reported a best balanced accuracy of 73.830% "
                 "and F1 of 0.770, but it included WLS, edge-detector, and calorimeter inputs. "
-                "APT results here are WLS-only and are not an apples-to-apples detector comparison."
+                "APT results here are WLS-only, use 10/15 MeV, and use whole-run splits. "
+                "This is a contextual reference, not an apples-to-apples detector comparison or "
+                "evidence that layer count alone caused any difference."
             ),
             "",
         ]
@@ -333,14 +436,16 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Benchmark WLS-only APT pair classifiers.")
     parser.add_argument("manifest", type=Path)
     parser.add_argument("--outdir", type=Path, default=Path("apt_benchmarks"))
-    parser.add_argument("--models", choices=["cnn", "hybrid"], nargs="+", default=["cnn", "hybrid"])
-    parser.add_argument("--epochs", type=int, default=25)
+    parser.add_argument("--models", choices=["cnn", "hybrid"], nargs="+", default=["cnn"])
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--patience", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--min-class-count-per-energy", type=int, default=500)
     parser.add_argument("--seed", type=int, default=SEED)
-    parser.add_argument("--skip-loeo", action="store_true")
+    parser.add_argument("--run-loeo", action="store_true")
+    parser.add_argument("--skip-loeo", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     return parser.parse_args()
 
@@ -357,7 +462,13 @@ def main():
     if dataset.geometry["feature_shape"] != [4, 20, 1492]:
         raise ValueError(f"Expected APT feature shape [4, 20, 1492], got {dataset.geometry['feature_shape']}")
 
-    indices = stratified_split(dataset.labels, dataset.energy_mev, dataset.run_ids, args.seed)
+    indices = campaign_split(
+        dataset.labels,
+        dataset.energy_mev,
+        dataset.run_ids,
+        dataset.random_seeds,
+        args.seed,
+    )
     class_counts = {}
     for energy in sorted(np.unique(dataset.energy_mev).tolist()):
         selected = dataset.labels[dataset.energy_mev == energy]
@@ -366,12 +477,21 @@ def main():
             "events": len(selected),
             "pair": pair,
             "nonpair": int(len(selected) - pair),
+            "incident_events": sum(
+                int(shard.metadata["counts"]["incident_events"])
+                for shard in dataset.shards
+                if float(shard.metadata["energy_mev"]) == float(energy)
+            ),
         }
+        class_counts[f"{energy:g}"]["usable_efficiency"] = (
+            class_counts[f"{energy:g}"]["events"]
+            / class_counts[f"{energy:g}"]["incident_events"]
+        )
         if min(pair, len(selected) - pair) < args.min_class_count_per_energy:
             raise ValueError(
                 f"{energy:g} MeV has pair={pair}, non-pair={len(selected) - pair}; "
                 f"both must be at least {args.min_class_count_per_energy}. "
-                "Generate and append another 6,400-event seed-run."
+                "The bounded campaign is underpowered; report this instead of silently generating more data."
             )
     payload = {
         "manifest": str(args.manifest.resolve()),
@@ -387,7 +507,7 @@ def main():
     for name in args.models:
         payload["main"][name] = run_experiment(name, dataset, indices, args, device, "main")
 
-    if not args.skip_loeo:
+    if args.run_loeo and not args.skip_loeo:
         for energy in sorted(np.unique(dataset.energy_mev).tolist()):
             tag = f"holdout_{energy:g}MeV"
             held_indices = leave_one_energy_out_split(

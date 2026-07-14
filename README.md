@@ -226,3 +226,91 @@ another 6,400-event seed-run when that threshold is not met. Override
 The historical ADAPT report remains a useful reference, but it used WLS,
 edge-detector, and calorimeter inputs. It is therefore not an apples-to-apples
 comparison with these WLS-only APT models.
+
+### Bounded 10/15 MeV exploratory campaign
+
+The simulation configuration and generation scripts live in `~/apt_pipeline`;
+the conversion, validation, training, and reporting code lives in this
+repository. The current exploratory campaign generates ten independent
+2,560-photon runs at each energy under:
+
+```text
+/ssd_data/boran.y/apt_pair_detection_exploratory_v2
+```
+
+For a new campaign, choose a new output directory so previous data is not
+overwritten. From the pipeline repository, run the smoke tests followed by all
+twenty production runs:
+
+```bash
+cd ~/apt_pipeline
+scripts/pair_detection/run_apt_pair_campaign.sh \
+  --output-root /ssd_data/boran.y/apt_pair_detection_exploratory_v3
+```
+
+The campaign runner uses 64-event smoke tests, seeds 21000-21009 at 10 MeV,
+seeds 21500-21509 at 15 MeV, and a 20 GiB storage guard. Completed runs are
+skipped when resuming. It writes raw truth, digitizer data, logs, effective
+configuration output, and `raw/SHA256SUMS`.
+
+After simulation completes, create and validate all twenty memory-mapped run
+shards. Pass the same campaign root used above:
+
+```bash
+cd ~/adapt_pair_detection
+python3 prepare_apt_campaign.py \
+  --root /ssd_data/boran.y/apt_pair_detection_exploratory_v3 \
+  --pipeline-repo ~/apt_pipeline
+```
+
+The manifest assigns seed endings 0-7 to training, 8 to validation, and 9 to
+testing. Train the initial CNN without a hyperparameter sweep:
+
+```bash
+./run_apt_exploratory_training.sh \
+  /ssd_data/boran.y/apt_pair_detection_exploratory_v3
+```
+
+Use a dedicated environment on machines without an existing PyTorch install:
+
+```bash
+python3 -m venv --without-pip .venv-apt
+python_version=$(.venv-apt/bin/python -c \
+  'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+pip3 install --target ".venv-apt/lib/python${python_version}/site-packages" \
+  -r requirements-apt.txt
+```
+
+The explicit target install also works on the APT server, where the system
+Python does not provide `ensurepip`.
+
+The training wrapper removes the server's C++-only `/usr/lib/libtorch` library
+path before importing the pinned Python wheel; it does not alter the Geant or
+APT pipeline environment.
+
+The report includes usable-event efficiency, per-energy confusion metrics, and
+95% uncertainty intervals. The historical ADAPT score is included only as a
+contextual reference because its inputs, energies, and split protocol differ.
+Results are written to `<campaign-root>/results/`, including the model
+checkpoint, JSON metrics, Markdown report, and checksums.
+
+Before committing future model or preprocessing changes, run:
+
+```bash
+env -u LD_LIBRARY_PATH .venv-apt/bin/python -B test_apt_pair_pipeline.py
+```
+
+To change model settings without modifying the wrapper, invoke the trainer
+directly. For example:
+
+```bash
+env -u LD_LIBRARY_PATH .venv-apt/bin/python train_apt_pair_models.py \
+  /ssd_data/boran.y/apt_pair_detection_exploratory_v3/datasets/manifest.json \
+  --outdir /ssd_data/boran.y/apt_pair_detection_exploratory_v3/results_trial \
+  --models cnn --epochs 10 --patience 3 --device cpu
+```
+
+Use a new results directory for experimental models so the baseline checkpoint
+and report remain intact. The bounded preprocessing driver intentionally
+expects the fixed 10/15 MeV seed scheme above; update `ENERGY_SEEDS` in
+`prepare_apt_campaign.py` if a future campaign changes those energies or seeds.

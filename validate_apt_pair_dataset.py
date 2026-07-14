@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from build_apt_pair_dataset import read_gun_event_ids, read_pair_truth
+from build_apt_pair_dataset import file_sha256, read_gun_event_ids, read_pair_truth
 
 
 EXPECTED_FEATURE_ORDER = [
@@ -27,7 +27,13 @@ def read_effective_config(path):
     return values
 
 
-def validate(metadata_path, config_log=None, min_class_count=1):
+def validate(
+    metadata_path,
+    config_log=None,
+    min_class_count=1,
+    allow_single_class=False,
+    expected_incident_events=None,
+):
     metadata_path = metadata_path.resolve()
     with metadata_path.open() as source:
         metadata = json.load(source)
@@ -58,8 +64,12 @@ def validate(metadata_path, config_log=None, min_class_count=1):
         raise ValueError("Array lengths or feature geometry are inconsistent")
     if not np.isfinite(features).all() or np.any(features < 0):
         raise ValueError("Features contain a negative or non-finite WLS signal")
-    if set(np.unique(labels).tolist()) != {0, 1}:
-        raise ValueError("Smoke dataset must contain both labels")
+    unique_labels = set(np.unique(labels).tolist())
+    allowed_labels = {0, 1}
+    if not unique_labels or not unique_labels.issubset(allowed_labels):
+        raise ValueError(f"Invalid labels: {sorted(unique_labels)}")
+    if not allow_single_class and unique_labels != allowed_labels:
+        raise ValueError("Dataset must contain both labels")
     pair_count = int(labels.sum())
     nonpair_count = int(len(labels) - pair_count)
     if min(pair_count, nonpair_count) < min_class_count:
@@ -78,6 +88,23 @@ def validate(metadata_path, config_log=None, min_class_count=1):
         raise ValueError("Stored labels disagree with CsI creator-process truth")
     if not set(event_ids.tolist()).issubset(truth_ids):
         raise ValueError("A stored event is missing CsI truth")
+    incident_events = metadata["counts"].get("incident_events")
+    if incident_events != len(gun_ids):
+        raise ValueError(
+            f"Incident event count mismatch: metadata={incident_events}, truth={len(gun_ids)}"
+        )
+    if expected_incident_events is not None and incident_events != expected_incident_events:
+        raise ValueError(
+            f"Expected {expected_incident_events} incident events, found {incident_events}"
+        )
+    for path_key, hash_key in [
+        ("digitizer", "digitizer_sha256"),
+        ("csi_truth", "csi_truth_sha256"),
+        ("gun_truth", "gun_truth_sha256"),
+    ]:
+        expected_hash = metadata["sources"].get(hash_key)
+        if expected_hash and file_sha256(Path(metadata["sources"][path_key])) != expected_hash:
+            raise ValueError(f"Source checksum mismatch for {path_key}")
 
     if config_log:
         effective = read_effective_config(config_log.resolve())
@@ -124,9 +151,17 @@ def parse_args():
     parser.add_argument("metadata", type=Path)
     parser.add_argument("--config-log", type=Path)
     parser.add_argument("--min-class-count", type=int, default=1)
+    parser.add_argument("--allow-single-class", action="store_true")
+    parser.add_argument("--expected-incident-events", type=int)
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     arguments = parse_args()
-    validate(arguments.metadata, arguments.config_log, arguments.min_class_count)
+    validate(
+        arguments.metadata,
+        arguments.config_log,
+        arguments.min_class_count,
+        arguments.allow_single_class,
+        arguments.expected_incident_events,
+    )

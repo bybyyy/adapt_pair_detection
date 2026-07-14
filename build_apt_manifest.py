@@ -11,6 +11,8 @@ def build_manifest(metadata_paths, output_path):
     datasets = []
     geometry = None
     run_ids = set()
+    summary = {}
+    partitions = {"train": [], "validation": [], "test": []}
     for metadata_path in metadata_paths:
         metadata_path = metadata_path.resolve()
         with metadata_path.open() as source:
@@ -26,6 +28,24 @@ def build_manifest(metadata_paths, output_path):
         if run_id in run_ids:
             raise ValueError(f"Duplicate run_id {run_id!r}")
         run_ids.add(run_id)
+        energy_key = f"{float(metadata['energy_mev']):g}"
+        energy_summary = summary.setdefault(
+            energy_key,
+            {"runs": 0, "incident_events": 0, "events": 0, "pair": 0, "nonpair": 0},
+        )
+        energy_summary["runs"] += 1
+        for key in ["incident_events", "events", "pair", "nonpair"]:
+            energy_summary[key] += int(metadata["counts"][key])
+
+        seed = int(metadata["random_seed"])
+        ending = seed % 10
+        if ending <= 7:
+            partition = "train"
+        elif ending == 8:
+            partition = "validation"
+        else:
+            partition = "test"
+        partitions[partition].append(run_id)
         try:
             relative = metadata_path.relative_to(output_path.parent)
             datasets.append(str(relative))
@@ -36,6 +56,8 @@ def build_manifest(metadata_paths, output_path):
         "format": "apt_pair_manifest_v1",
         "datasets": datasets,
         "geometry": geometry,
+        "summary_by_energy": summary,
+        "run_partitions": partitions,
     }
     with output_path.open("w") as output:
         json.dump(manifest, output, indent=2)
@@ -53,4 +75,3 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     build_manifest(args.metadata, args.output)
-

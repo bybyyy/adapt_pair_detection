@@ -14,7 +14,7 @@ try:
 
     from EventDataset import AptPairDataset
     from train_2d_cnn import PairEventAPT2DCNN
-    from train_apt_pair_models import leave_one_energy_out_split, stratified_split
+    from train_apt_pair_models import campaign_split, leave_one_energy_out_split, stratified_split
     from train_hybrid_cnn import PairEventAPTHybridCNN, make_apt_wls_engineered_features
 except ModuleNotFoundError:
     torch = None
@@ -131,6 +131,13 @@ class AptPairDatasetTests(unittest.TestCase):
 
 @unittest.skipIf(torch is None, "PyTorch is not installed in this interpreter")
 class AptPairModelTests(unittest.TestCase):
+    def test_metrics_include_specificity_and_confidence_interval(self):
+        from train_apt_pair_models import metrics_with_confidence
+
+        metrics = metrics_with_confidence(8, 2, 2, 8)
+        self.assertAlmostEqual(metrics["specificity"], 0.8)
+        self.assertIn("specificity", metrics["confidence_intervals_95"])
+
     def test_models_accept_geometry_independent_wls_maps(self):
         wls = torch.rand(2, 4, 20, 32)
         self.assertEqual(PairEventAPT2DCNN()(wls).shape, (2,))
@@ -166,6 +173,30 @@ class AptPairModelTests(unittest.TestCase):
         self.assertTrue(loeo_runs[0].isdisjoint(loeo_runs[2]))
         self.assertTrue(loeo_runs[1].isdisjoint(loeo_runs[2]))
         self.assertEqual(set(energies[loeo[2].numpy()].tolist()), {50.0})
+
+    def test_campaign_split_uses_seed_endings(self):
+        energies = []
+        labels = []
+        run_ids = []
+        random_seeds = []
+        for energy, base in [(10.0, 21000), (15.0, 21500)]:
+            for ending in range(10):
+                for label in [0, 1, 0, 1]:
+                    energies.append(energy)
+                    labels.append(label)
+                    run_ids.append(f"{energy:g}_seed_{base + ending}")
+                    random_seeds.append(base + ending)
+        energies = np.asarray(energies)
+        labels = np.asarray(labels)
+        run_ids = np.asarray(run_ids, dtype=object)
+        random_seeds = np.asarray(random_seeds)
+
+        partitions = campaign_split(labels, energies, run_ids, random_seeds)
+        expected_endings = [set(range(8)), {8}, {9}]
+        for indices, endings in zip(partitions, expected_endings):
+            selected = random_seeds[indices.numpy()]
+            self.assertEqual(set((selected % 10).tolist()), endings)
+
 
 
 if __name__ == "__main__":
